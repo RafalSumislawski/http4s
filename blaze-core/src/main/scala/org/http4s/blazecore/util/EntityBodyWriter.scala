@@ -59,7 +59,7 @@ private[http4s] trait EntityBodyWriter[F[_]] {
     * @return the Task which when run will unwind the Process
     */
   def writeEntityBody(p: EntityBody[F]): F[Boolean] = {
-    Fs2Hack.extractChunk(p) match {
+    Fs2ChunkExtractor.tryExtractingChunk(p) match {
       case Some(chunk) =>
         fromFuture(F.delay(writeEnd(chunk)))
       case None =>
