@@ -194,26 +194,20 @@ private[blaze] class Http1ServerStage[F[_]](
 
     parser.collectMessage(body, requestAttrs()) match {
       case Right(req) =>
-        executionContext.execute(new Runnable {
-          def run(): Unit = {
-            val action = Sync[F]
-              .defer(raceTimeout(req))
-              .recoverWith(serviceErrorHandler(req))
-              .flatMap(resp => F.delay(renderResponse(req, resp, cleanup)))
+        val action = Sync[F]
+          .defer(raceTimeout(req))
+          .recoverWith(serviceErrorHandler(req))
+          .flatMap(resp => F.delay(renderResponse(req, resp, cleanup)))
 
-            val theCancelToken = Some(
-              F.runCancelable(action) {
-                case Right(()) => IO.unit
-                case Left(t) =>
-                  IO(logger.error(t)(s"Error running request: $req")).attempt *> IO(
-                    closeConnection())
-              }.unsafeRunSync())
+        val theCancelToken = Some(
+          F.runCancelable(action) {
+            case Right(()) => IO.unit
+            case Left(t) =>
+              IO(logger.error(t)(s"Error running request: $req")).attempt *> IO(
+                closeConnection())
+          }.unsafeRunSync())
 
-            parser.synchronized {
-              cancelToken = theCancelToken
-            }
-          }
-        })
+          cancelToken = theCancelToken
       case Left((e, protocol)) =>
         badMessage(e.details, new BadMessage(e.sanitized), Request[F]().withHttpVersion(protocol))
     }
