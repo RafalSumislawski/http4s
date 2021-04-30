@@ -317,8 +317,9 @@ lazy val blazeClient = libraryProject("blaze-client")
       ProblemFilters.exclude[DirectMissingMethodProblem]("org.http4s.client.blaze.Http1Connection.reset"),
       ProblemFilters.exclude[MissingClassProblem]("org.http4s.client.blaze.Http1Connection$Running$"),
     ),
+    libraryDependencies ++= Seq(logbackClassic)
   )
-  .dependsOn(blazeCore % "compile;test->test", client % "compile;test->test")
+  .dependsOn(blazeCore % "compile;test->test", client % "compile;test->test", blazeServer % "test", asyncHttpClient % "test")
 
 lazy val asyncHttpClient = libraryProject("async-http-client")
   .settings(

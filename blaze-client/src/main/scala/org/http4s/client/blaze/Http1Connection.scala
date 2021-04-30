@@ -191,6 +191,7 @@ private final class Http1Connection[F[_]](
             val writeRequest: F[Boolean] = getChunkEncoder(req, mustClose, rr)
               .write(rr, req.body)
               .guarantee(F.delay(resetWrite()))
+              .map(b => {logger.debug(s"Should close? $b"); b})
               .onError {
                 case EOF => F.unit
                 case t => F.delay(logger.error(t)("Error rendering request"))
