@@ -19,7 +19,9 @@ package org.http4s.client.blaze
 import cats.effect.IO
 import cats.implicits._
 import org.http4s.client.asynchttpclient.AsyncHttpClient
+import org.http4s.client.jetty.JettyClient
 import org.http4s.dsl.io._
+import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits.http4sKleisliResponseSyntaxOptionT
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
@@ -186,6 +188,30 @@ class BlazeIssues extends Http4sSuite {
       server,
       AsyncHttpClient.resource[IO]()
     ).tupled.use { case (_, client) => for {
+      _ <- client.expect[String](Uri.fromString(s"http://127.0.0.1:12345").yolo).attemptTap(result => IO(println(result)))
+      _ <- IO.sleep(6.seconds)
+      _ <- client.expect[String](Uri.fromString(s"http://127.0.0.1:12345").yolo).attemptTap(result => IO(println(result)))
+    } yield ()
+    }.unsafeRunSync()
+  }
+
+  test("EmberClient closes connection after server sends FIN-ACK through an idle connection") {
+    (
+      server,
+      EmberClientBuilder.default[IO].build
+      ).tupled.use { case (_, client) => for {
+      _ <- client.expect[String](Uri.fromString(s"http://127.0.0.1:12345").yolo).attemptTap(result => IO(println(result)))
+      _ <- IO.sleep(6.seconds)
+      _ <- client.expect[String](Uri.fromString(s"http://127.0.0.1:12345").yolo).attemptTap(result => IO(println(result)))
+    } yield ()
+    }.unsafeRunSync()
+  }
+
+  test("JettyClient closes connection after server sends FIN-ACK through an idle connection") {
+    (
+      server,
+      JettyClient.resource[IO]()
+      ).tupled.use { case (_, client) => for {
       _ <- client.expect[String](Uri.fromString(s"http://127.0.0.1:12345").yolo).attemptTap(result => IO(println(result)))
       _ <- IO.sleep(6.seconds)
       _ <- client.expect[String](Uri.fromString(s"http://127.0.0.1:12345").yolo).attemptTap(result => IO(println(result)))

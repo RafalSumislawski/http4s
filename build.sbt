@@ -319,7 +319,7 @@ lazy val blazeClient = libraryProject("blaze-client")
     ),
     libraryDependencies ++= Seq(logbackClassic)
   )
-  .dependsOn(blazeCore % "compile;test->test", client % "compile;test->test", blazeServer % "test", asyncHttpClient % "test")
+  .dependsOn(blazeCore % "compile;test->test", client % "compile;test->test", blazeServer % "test", asyncHttpClient % "test", emberClient % "test", jettyClient % "test")
 
 lazy val asyncHttpClient = libraryProject("async-http-client")
   .settings(
