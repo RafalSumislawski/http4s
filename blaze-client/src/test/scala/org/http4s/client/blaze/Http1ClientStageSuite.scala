@@ -23,13 +23,17 @@ import cats.effect.concurrent.Deferred
 import cats.syntax.all._
 import fs2.Stream
 import fs2.concurrent.Queue
+import org.http4s.blaze.pipeline.Command.{Disconnected, EOF}
+
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import org.http4s.blaze.pipeline.LeafBuilder
-import org.http4s.blazecore.{QueueTestHead, SeqTestHead}
+import org.http4s.blazecore.{QueueTestHead, SeqTestHead, TestHead}
 import org.http4s.client.blaze.bits.DefaultUserAgent
 import org.http4s.headers.`User-Agent`
 import org.http4s.syntax.all._
+
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class Http1ClientStageSuite extends Http4sSuite {
@@ -294,5 +298,25 @@ class Http1ClientStageSuite extends Http4sSuite {
 
       hs.intercept[IllegalStateException]
     }
+  }
+
+  fooConnection.test("Close idle connection after server closes it") { tail =>
+
+    val h = new TestHead("EofingTestHead") {
+      private val bodyIt = Seq(mkBuffer(resp)).iterator
+
+      override def readRequest(size: Int): Future[ByteBuffer] =
+        synchronized {
+          if (!closed && bodyIt.hasNext) Future.successful(bodyIt.next())
+          else Future.failed(EOF)
+        }
+    }
+    LeafBuilder(tail).base(h)
+
+    for {
+      _ <- tail.runRequest(FooRequest, IO.never) //the first request succeeds
+      _ <- IO.sleep(200.millis) // then the server closes the connection
+      isClosed <- IO(tail.isClosed) // and the client should recognize that the connection has been closed
+    } yield assert(isClosed)
   }
 }
