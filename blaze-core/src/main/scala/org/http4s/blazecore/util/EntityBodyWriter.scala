@@ -59,9 +59,14 @@ private[http4s] trait EntityBodyWriter[F[_]] {
     * @return the Task which when run will unwind the Process
     */
   def writeEntityBody(p: EntityBody[F]): F[Boolean] = {
-    val writeBody: F[Unit] = p.through(writePipe).compile.drain
-    val writeBodyEnd: F[Boolean] = fromFuture(F.delay(writeEnd(Chunk.empty)))
-    writeBody *> writeBodyEnd
+    Fs2ChunkExtractor.tryExtractingChunk(p) match {
+      case Some(chunk) =>
+        fromFuture(F.delay(writeEnd(chunk)))
+      case None =>
+        val writeBody: F[Unit] = p.through(writePipe).compile.drain
+        val writeBodyEnd: F[Boolean] = fromFuture(F.delay(writeEnd(Chunk.empty)))
+        writeBody *> writeBodyEnd
+    }
   }
 
   /** Writes each of the body chunks, if the write fails it returns
