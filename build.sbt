@@ -522,11 +522,11 @@ lazy val bench = http4sProject("bench")
   .settings(
     description := "Benchmarks for http4s",
     startYear := Some(2015),
-    libraryDependencies += circeParser,
+    libraryDependencies ++= Seq(circeParser, logbackClassic),
     undeclaredCompileDependenciesTest := {},
     unusedCompileDependenciesTest := {},
   )
-  .dependsOn(core, circe)
+  .dependsOn(core, circe, blazeClient, blazeServer, emberClient, emberServer, theDsl)
 
 lazy val docs = http4sProject("docs")
   .enablePlugins(
