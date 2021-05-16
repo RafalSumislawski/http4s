@@ -119,7 +119,8 @@ class BlazeClientSuite extends BlazeClientBase {
     resp.assert
   }
 
-  test("Blaze Http1Client should cancel infinite request on completion") {
+  test(
+    "Blaze Http1Client should stop sending data when the server sends response and closes connection") {
     val addresses = jettyServer().addresses
     val address = addresses.head
     val name = address.getHostName
@@ -130,12 +131,53 @@ class BlazeClientSuite extends BlazeClientBase {
           val body = Stream(0.toByte).repeat.onFinalizeWeak(reqClosed.complete(()))
           val req = Request[IO](
             method = Method.POST,
-            uri = Uri.fromString(s"http://$name:$port/").yolo
+            uri =
+              Uri.fromString(s"http://$name:$port/respond-immediately-and-close-connection").yolo
           ).withBodyStream(body)
           client.status(req) >> reqClosed.get
         }
       }
       .assertEquals(())
+  }
+
+  test(
+    "Blaze Http1Client should fail with request timeout if the request body takes too long to send") {
+    val addresses = jettyServer().addresses
+    val address = addresses.head
+    val name = address.getHostName
+    val port = address.getPort
+    mkClient(1, requestTimeout = 500.millis, responseHeaderTimeout = Duration.Inf)
+      .use { client =>
+        val body = Stream(0.toByte).repeat
+        val req = Request[IO](
+          method = Method.POST,
+          uri = Uri.fromString(s"http://$name:$port/process-request-entity").yolo
+        ).withBodyStream(body)
+        client.status(req)
+      }
+      .as(false)
+      .recover { case _: TimeoutException => true }
+      .assert
+  }
+
+  test(
+    "Blaze Http1Client should fail with response header timeout if the request body takes too long to send") {
+    val addresses = jettyServer().addresses
+    val address = addresses.head
+    val name = address.getHostName
+    val port = address.getPort
+    mkClient(1, requestTimeout = Duration.Inf, responseHeaderTimeout = 500.millis)
+      .use { client =>
+        val body = Stream(0.toByte).repeat
+        val req = Request[IO](
+          method = Method.POST,
+          uri = Uri.fromString(s"http://$name:$port/process-request-entity").yolo
+        ).withBodyStream(body)
+        client.status(req)
+      }
+      .as(false)
+      .recover { case _: TimeoutException => true }
+      .assert
   }
 
   test("Blaze Http1Client should doesn't leak connection on timeout") {
