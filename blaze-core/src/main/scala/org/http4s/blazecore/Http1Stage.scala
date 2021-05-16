@@ -199,28 +199,40 @@ private[http4s] trait Http1Stage[F[_]] { self: TailStage[ByteBuffer] =>
   final protected def collectBodyFromParser(
       buffer: ByteBuffer,
       eofCondition: () => Either[Throwable, Option[Chunk[Byte]]])
-      : (EntityBody[F], () => Future[ByteBuffer]) =
-    if (contentComplete())
+      : (EntityBody[F], () => Future[ByteBuffer]) = {
+    logger.trace("collectBodyFromParser")
+    if (contentComplete()) {
+      logger.trace("collectBodyFromParser.a")
       if (buffer.remaining() == 0) Http1Stage.CachedEmptyBody
       else (EmptyBody, () => Future.successful(buffer))
-    // try parsing the existing buffer: many requests will come as a single chunk
+    } // try parsing the existing buffer: many requests will come as a single chunk
     else if (buffer.hasRemaining) doParseContent(buffer) match {
       case Some(buff) if contentComplete() =>
+        logger.trace("collectBodyFromParser.b") // test with single char body goes here
         Stream.chunk(Chunk.byteBuffer(buff)).covary[F] -> Http1Stage
           .futureBufferThunk(buffer)
 
       case Some(buff) =>
+        logger.trace("collectBodyFromParser.c")
         val (rst, end) = streamingBody(buffer, eofCondition)
         (Stream.chunk(Chunk.byteBuffer(buff)) ++ rst, end)
 
       case None if contentComplete() =>
+        logger.trace("collectBodyFromParser.d")
         if (buffer.hasRemaining) EmptyBody -> Http1Stage.futureBufferThunk(buffer)
         else Http1Stage.CachedEmptyBody
 
-      case None => streamingBody(buffer, eofCondition)
+      case None =>
+        logger.trace("collectBodyFromParser.e")
+        streamingBody(buffer, eofCondition)
     }
     // we are not finished and need more data.
-    else streamingBody(buffer, eofCondition)
+    else {
+      // test with no body goes here
+      logger.trace("collectBodyFromParser.f")
+      streamingBody(buffer, eofCondition)
+    }
+  }
 
   // Streams the body off the wire
   private def streamingBody(

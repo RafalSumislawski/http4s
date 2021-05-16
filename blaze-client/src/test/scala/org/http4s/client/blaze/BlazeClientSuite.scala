@@ -128,7 +128,7 @@ class BlazeClientSuite extends BlazeClientBase {
     val port = address.getPort
     Deferred[IO, Unit]
       .flatMap { reqClosed =>
-        mkClient(1, requestTimeout = 10.seconds).use { client =>
+        mkClient(1, requestTimeout = 2.seconds).use { client =>
           val body = Stream(0.toByte).repeat.onFinalizeWeak(reqClosed.complete(()))
           val req = Request[IO](
             method = Method.POST,
@@ -139,7 +139,6 @@ class BlazeClientSuite extends BlazeClientBase {
         }
       }
       .assertEquals(())
-    pending
   }
 
   test(
@@ -150,7 +149,7 @@ class BlazeClientSuite extends BlazeClientBase {
     val port = address.getPort
     Deferred[IO, Unit]
       .flatMap { reqClosed =>
-        mkClient(1, requestTimeout = 10.seconds).use { client =>
+        mkClient(1, requestTimeout = 2.seconds).use { client =>
           val body = Stream(0.toByte).repeat.onFinalizeWeak(reqClosed.complete(()))
           val req = Request[IO](
             method = Method.POST,

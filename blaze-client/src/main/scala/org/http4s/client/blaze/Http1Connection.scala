@@ -109,6 +109,7 @@ private final class Http1Connection[F[_]](
 
   @tailrec
   def resetRead(): Unit = {
+    logger.trace("resetRead")
     val state = stageState.get()
     val nextState = state match {
       case ReadWrite => Some(Write)
@@ -124,6 +125,7 @@ private final class Http1Connection[F[_]](
 
   @tailrec
   def resetWrite(): Unit = {
+    logger.trace("resetWrite")
     val state = stageState.get()
     val nextState = state match {
       case ReadWrite => Some(Read)
@@ -217,8 +219,10 @@ private final class Http1Connection[F[_]](
                 mustClose,
                 doesntHaveBody = req.method == Method.HEAD,
                 idleTimeoutS,
-                idleRead)
-              _ <- writeFiber.join
+                idleRead).attemptTap(e => Sync[F].delay(println(e.toString)))
+              // We need to wait for the write to complete so that by the time we attempt to recycle the connection it is fully idle.
+              // If we read a response, a failure of the write should not bother us.
+              _ <- writeFiber.join.attemptTap(e => Sync[F].delay(println(e.toString))).attempt
             } yield response
 
             F.race(response, timeoutFiber.join)
@@ -294,7 +298,8 @@ private final class Http1Connection[F[_]](
       val httpVersion: HttpVersion = parser.getHttpVersion()
 
       // we are now to the body
-      def terminationCondition(): Either[Throwable, Option[Chunk[Byte]]] =
+      def terminationCondition(): Either[Throwable, Option[Chunk[Byte]]] = {
+        logger.trace("terminationCondition")
         stageState.get match { // if we don't have a length, EOF signals the end of the body.
           case Error(e) if e != EOF => Either.left(e)
           case _ =>
@@ -302,6 +307,7 @@ private final class Http1Connection[F[_]](
               Either.left(InvalidBodyException("Received premature EOF."))
             else Either.right(None)
         }
+      }
 
       def cleanup(): Unit =
         if (closeOnFinish || headers.get(Connection).exists(_.hasClose)) {
@@ -347,18 +353,26 @@ private final class Http1Connection[F[_]](
         }
 
         if (parser.contentComplete()) {
+          logger.trace("parsePrelude.h")
           trailerCleanup()
           cleanup()
           attributes -> rawBody
-        } else
+        } else {
+          logger.trace("parsePrelude.j")
+
           attributes -> rawBody.onFinalizeCaseWeak {
             case ExitCase.Completed =>
-              Async.shift(executionContext) *> F.delay { trailerCleanup(); cleanup(); }
+              Async.shift(executionContext) *> F.delay {
+                trailerCleanup(); cleanup();
+              }
             case ExitCase.Error(_) | ExitCase.Canceled =>
               Async.shift(executionContext) *> F.delay {
-                trailerCleanup(); cleanup(); stageShutdown()
+                trailerCleanup();
+                cleanup();
+                stageShutdown()
               }
           }
+        }
       }
       cb(
         Right(

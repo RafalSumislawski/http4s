@@ -103,7 +103,7 @@ object BlazeClient {
                 case Some(stage) => F.async[TimeoutException](stage.init)
                 case None => F.never[TimeoutException]
               }
-              val res = next.connection
+              val res: F[Resource[F, Response[F]]] = next.connection
                 .runRequest(req, idleTimeoutF)
                 .map { r =>
                   Resource.makeCase(F.pure(r)) {
