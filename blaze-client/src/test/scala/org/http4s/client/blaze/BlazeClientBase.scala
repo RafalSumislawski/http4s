@@ -75,8 +75,14 @@ trait BlazeClientBase extends Http4sSuite {
       override def doPost(req: HttpServletRequest, resp: HttpServletResponse): Unit =
         req.getRequestURI match {
           case "/respond-immediately-and-close-connection" =>
-            // We don't consume the req.getInputStream (the request entity).
-            // That means that:
+            // We don't consume the req.getInputStream (the request entity). That means that:
+            // - The client may receive the response before sending the whole request
+            // - Jetty will send a "Connection: close" header and a TCP FIN+ACK along with the response, closing the connection.
+            resp.getOutputStream.print("a")
+            resp.setStatus(Status.Ok.code)
+
+          case "/respond-immediately-without-body-and-close-connection" =>
+            // We don't consume the req.getInputStream (the request entity). That means that:
             // - The client may receive the response before sending the whole request
             // - Jetty will send a "Connection: close" header and a TCP FIN+ACK along with the response, closing the connection.
             resp.setStatus(Status.Ok.code)
