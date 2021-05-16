@@ -25,7 +25,6 @@ import java.util.concurrent.TimeoutException
 import org.http4s._
 import org.http4s.syntax.all._
 import org.http4s.client.ConnectionFailure
-import org.specs2.execute.StandardResults.pending
 import scala.concurrent.duration._
 
 class BlazeClientSuite extends BlazeClientBase {
@@ -132,8 +131,7 @@ class BlazeClientSuite extends BlazeClientBase {
           val body = Stream(0.toByte).repeat.onFinalizeWeak(reqClosed.complete(()))
           val req = Request[IO](
             method = Method.POST,
-            uri =
-              Uri.fromString(s"http://$name:$port/respond-immediately-and-close-connection").yolo
+            uri = Uri.fromString(s"http://$name:$port/respond-and-close-immediately").yolo
           ).withBodyStream(body)
           client.status(req) >> reqClosed.get
         }
@@ -153,8 +151,7 @@ class BlazeClientSuite extends BlazeClientBase {
           val body = Stream(0.toByte).repeat.onFinalizeWeak(reqClosed.complete(()))
           val req = Request[IO](
             method = Method.POST,
-            uri =
-              Uri.fromString(s"http://$name:$port/respond-immediately-without-body-and-close-connection").yolo
+            uri = Uri.fromString(s"http://$name:$port/respond-and-close-immediately-no-body").yolo
           ).withBodyStream(body)
           client.status(req) >> reqClosed.get
         }
