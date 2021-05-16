@@ -56,7 +56,7 @@ private final class Http1Connection[F[_]](
   private val parser =
     new BlazeHttp1ClientParser(maxResponseLineSize, maxHeaderLength, maxChunkSize, parserMode)
 
-  private val stageState = new AtomicReference[State](Idle(None))
+  private val stageState = new AtomicReference[State](New)
 
   override def isClosed: Boolean =
     stageState.get match {
@@ -66,7 +66,7 @@ private final class Http1Connection[F[_]](
 
   override def isRecyclable: Boolean =
     stageState.get match {
-      case Idle(_) => true
+      case New | Idle(_)  => true
       case _ => false
     }
 
@@ -112,7 +112,7 @@ private final class Http1Connection[F[_]](
     val state = stageState.get()
     val nextState = state match {
       case ReadWrite => Some(Write)
-      case Read => Some(Idle(Some(startIdleRead())))
+      case Read => Some(Idle(startIdleRead()))
       case _ => None
     }
 
@@ -127,7 +127,7 @@ private final class Http1Connection[F[_]](
     val state = stageState.get()
     val nextState = state match {
       case ReadWrite => Some(Read)
-      case Write => Some(Idle(Some(startIdleRead())))
+      case Write => Some(Idle(startIdleRead()))
       case _ => None
     }
 
@@ -150,12 +150,16 @@ private final class Http1Connection[F[_]](
   def runRequest(req: Request[F], idleTimeoutF: F[TimeoutException]): F[Response[F]] =
     F.defer[Response[F]] {
       stageState.get match {
-        case i @ Idle(idleRead) =>
-          if (stageState.compareAndSet(i, ReadWrite)) {
-            logger.debug(s"Connection was idle. Running.")
+        case state @ (New | Idle(_)) =>
+          if (stageState.compareAndSet(state, ReadWrite)) {
+            logger.debug(s"Connection was idle/new. Running.")
+            val idleRead = state match {
+              case Idle(idleRead) => Some(idleRead)
+              case _ => None
+            }
             executeRequest(req, idleTimeoutF, idleRead)
           } else {
-            logger.debug(s"Connection changed state since checking it was idle. Looping.")
+            logger.debug(s"Connection changed state since checking it was idle/new. Looping.")
             runRequest(req, idleTimeoutF)
           }
         case ReadWrite | Read | Write =>
@@ -414,7 +418,8 @@ private object Http1Connection {
 
   // ADT representing the state that the ClientStage can be in
   private sealed trait State
-  private final case class Idle(idleRead: Option[Future[ByteBuffer]]) extends State
+  private case object New extends State
+  private final case class Idle(idleRead: Future[ByteBuffer]) extends State
   private case object ReadWrite extends State
   private case object Read extends State
   private case object Write extends State
