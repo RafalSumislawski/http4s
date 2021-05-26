@@ -121,6 +121,7 @@ class BlazeClientSuite extends BlazeClientBase {
 
   test(
     "Blaze Http1Client should stop sending data when the server sends response and closes connection") {
+    // https://datatracker.ietf.org/doc/html/rfc2616#section-8.2.2
     val addresses = jettyServer().addresses
     val address = addresses.head
     val name = address.getHostName
@@ -136,11 +137,13 @@ class BlazeClientSuite extends BlazeClientBase {
           client.status(req) >> reqClosed.get
         }
       }
-      .assertEquals(())
   }
 
   test(
     "Blaze Http1Client should stop sending data when the server sends response without body and closes connection") {
+    // https://datatracker.ietf.org/doc/html/rfc2616#section-8.2.2
+    // Receiving a response with and without body exercises different execution path in blaze client.
+
     val addresses = jettyServer().addresses
     val address = addresses.head
     val name = address.getHostName
@@ -156,7 +159,6 @@ class BlazeClientSuite extends BlazeClientBase {
           client.status(req) >> reqClosed.get
         }
       }
-      .assertEquals(())
   }
 
   test(
@@ -174,8 +176,11 @@ class BlazeClientSuite extends BlazeClientBase {
         ).withBodyStream(body)
         client.status(req)
       }
-      .as(false)
-      .recover { case _: TimeoutException => true }
+      .attempt
+      .map {
+        case Left(_: TimeoutException) => true
+        case _ => false
+      }
       .assert
   }
 
@@ -194,8 +199,11 @@ class BlazeClientSuite extends BlazeClientBase {
         ).withBodyStream(body)
         client.status(req)
       }
-      .as(false)
-      .recover { case _: TimeoutException => true }
+      .attempt
+      .map {
+        case Left(_: TimeoutException) => true
+        case _ => false
+      }
       .assert
   }
 
