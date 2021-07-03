@@ -30,4 +30,9 @@ package object blazecore {
     def cancel() = ()
     override def toString = "no op cancelable"
   }
+
+  private[blazecore] val NoOpCancelable2 = new Cancelable {
+    def cancel() = ()
+    override def toString = "no op cancelable2"
+  }
 }

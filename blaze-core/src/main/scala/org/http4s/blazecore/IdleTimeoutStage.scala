@@ -70,16 +70,29 @@ final private[http4s] class IdleTimeoutStage[A](
   def init(cb: Callback[TimeoutException]): Unit = {
     logger.debug(s"Starting idle timeout stage with timeout of ${timeout.toMillis} ms")
     stage.cb = cb
-    resetTimeout()
+    setTimeout()
   }
 
-  private def setAndCancel(next: Cancelable): Unit = {
-    val _ = timeoutState.getAndSet(next).cancel()
+  private def setTimeout(): Unit = {
+    val neww = exec.schedule(killSwitch, ec, timeout)
+    val previous = timeoutState.getAndSet(neww)
+    if (previous == NoOpCancelable) ()
+    else if(previous == NoOpCancelable2) logger.debug("AAa2!")
+    else logger.debug("AAa3!")
   }
 
-  private def resetTimeout(): Unit =
-    setAndCancel(exec.schedule(killSwitch, ec, timeout))
+  private def resetTimeout(): Unit = {
+    val neww = exec.schedule(killSwitch, ec, timeout)
+    val previous = timeoutState.getAndSet(neww)
+    if (previous == NoOpCancelable) {logger.debug("BBb1!"); cancelTimeout()}
+    else if(previous == NoOpCancelable2) {logger.debug("BBb2!"); cancelTimeout()}
+    else previous.cancel()
+  }
 
-  private def cancelTimeout(): Unit =
-    setAndCancel(NoOpCancelable)
+  def cancelTimeout(): Unit = {
+    val previous = timeoutState.getAndSet(NoOpCancelable2)
+    if (previous == NoOpCancelable) logger.debug("CCc1!")
+    else if(previous == NoOpCancelable2) logger.debug("CCc2!")
+    else previous.cancel()
+  }
 }
